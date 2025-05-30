@@ -1,4 +1,5 @@
 const VideoProgress = require('../models/videoProgress');
+const YouTubeService = require('../services/youtubeService');
 
 const updateVideoStatus = async (req, res) => {
     try {
@@ -7,7 +8,7 @@ const updateVideoStatus = async (req, res) => {
             return res.status(400).json({ error: 'Invalid status' });
         }
         await VideoProgress.updateStatus(progressId, status);
-        res.json({ message: 'Video status updated' });
+        res.status(200).json({ message: 'Video status updated' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -18,7 +19,17 @@ const getVideoProgress = async (req, res) => {
         const { playlistId } = req.params;
         const userId = req.user.uid;
         const progress = await VideoProgress.getUserProgress(userId, playlistId);
-        res.json(progress);
+        const enrichedProgress = await Promise.all(
+            progress.map(async (item) => {
+                const metadata = await YouTubeService.getVideoMetadata(item.videoUrl);
+                return {
+                    ...item,
+                    thumbnail: metadata.thumbnail,
+                    duration: metadata.duration,
+                };
+            })
+        );
+        res.status(200).json(enrichedProgress);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -29,7 +40,8 @@ const createVideoProgress = async (req, res) => {
         const { playlistId, videoUrl } = req.body;
         const userId = req.user.uid;
         const progressId = await VideoProgress.create(userId, playlistId, videoUrl);
-        res.json({ id: progressId });
+        const metadata = await YouTubeService.getVideoMetadata(videoUrl);
+        res.status(201).json({ id: progressId, metadata });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -7,7 +7,7 @@ class Playlist {
             userId,
             name,
             videos: [],
-            createdAt: new Date()
+            createdAt: new Date().toISOString()
         });
         return playlistRef.id;
     }
