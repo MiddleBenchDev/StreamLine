@@ -1,38 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:streamline/models/playlist.dart';
-import 'package:streamline/models/video_progress.dart';
 import 'package:streamline/providers/auth_provider.dart';
 import 'package:streamline/providers/playlist_provider.dart';
-import 'package:streamline/widgets/video_tile.dart';
+import 'package:streamline/screens/playlist_detail_screen.dart';
+import 'package:streamline/widgets/playlist_card.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-class PlaylistDetailScreen extends StatefulWidget {
-  final Playlist playlist;
-
-  const PlaylistDetailScreen({super.key, required this.playlist});
+class PlaylistScreen extends StatefulWidget {
+  const PlaylistScreen({super.key});
 
   @override
-  PlaylistDetailScreenState createState() => PlaylistDetailScreenState();
+  PlaylistScreenState createState() => PlaylistScreenState();
 }
 
-class PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+class PlaylistScreenState extends State<PlaylistScreen> {
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchVideoProgress();
+    _fetchPlaylists();
   }
 
-  Future<void> _fetchVideoProgress() async {
+  Future<void> _fetchPlaylists() async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final playlistProvider =
           Provider.of<PlaylistProvider>(context, listen: false);
       final token = authProvider.token;
       if (token != null) {
-        await playlistProvider.fetchVideoProgress(token, widget.playlist.id);
+        await playlistProvider.fetchPlaylists(token);
         setState(() {
           isLoading = false;
         });
@@ -44,47 +41,43 @@ class PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load video progress: $e')),
+        SnackBar(content: Text('Failed to load playlists: $e')),
       );
     }
   }
 
-  Future<void> _addVideo(String videoUrl) async {
+  Future<void> _createPlaylist(String name) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final playlistProvider =
           Provider.of<PlaylistProvider>(context, listen: false);
       final token = authProvider.token;
       if (token != null) {
-        await playlistProvider.addVideoToPlaylist(
-            token, widget.playlist.id, videoUrl);
-        await playlistProvider.createVideoProgress(
-            token, widget.playlist.id, videoUrl);
-        await _fetchVideoProgress();
+        await playlistProvider.createPlaylist(token, name);
       } else {
         throw Exception('Not authenticated');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add video: $e')),
+        SnackBar(content: Text('Failed to create playlist: $e')),
       );
     }
   }
 
-  Future<void> _updateVideoStatus(String progressId, String status) async {
+  Future<void> _deletePlaylist(String playlistId) async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final playlistProvider =
           Provider.of<PlaylistProvider>(context, listen: false);
       final token = authProvider.token;
       if (token != null) {
-        await playlistProvider.updateVideoStatus(token, progressId, status);
+        await playlistProvider.deletePlaylist(token, playlistId);
       } else {
         throw Exception('Not authenticated');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update video status: $e')),
+        SnackBar(content: Text('Failed to delete playlist: $e')),
       );
     }
   }
@@ -92,49 +85,46 @@ class PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final playlistProvider = Provider.of<PlaylistProvider>(context);
-    final videoProgress = playlistProvider.progress;
+    final playlists = playlistProvider.playlists;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.playlist.name),
+        title: const Text('My Playlists'),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : videoProgress.isEmpty
-              ? const Center(child: Text('No videos in this playlist'))
+          : playlists.isEmpty
+              ? const Center(child: Text('No playlists found'))
               : ListView.builder(
-                  itemCount: videoProgress.length,
+                  itemCount: playlists.length,
                   itemBuilder: (context, index) {
-                    final progress = videoProgress[index];
-                    return VideoTile(
-                      progress: progress,
-                      onStatusChanged: (status) =>
-                          _updateVideoStatus(progress.id, status),
-                      onTap: () async {
-                        final url = Uri.parse(progress.videoUrl);
-                        if (await canLaunchUrl(url)) {
-                          await launchUrl(url);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Could not open video')),
-                          );
-                        }
+                    final playlist = playlists[index];
+                    return PlaylistCard(
+                      playlist: playlist,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                PlaylistDetailScreen(playlist: playlist),
+                          ),
+                        );
                       },
+                      onDelete: () => _deletePlaylist(playlist.id),
                     );
                   },
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final videoUrl = await showDialog<String>(
+          final name = await showDialog<String>(
             context: context,
             builder: (context) {
               final controller = TextEditingController();
               return AlertDialog(
-                title: const Text('Add YouTube Video'),
+                title: const Text('New Playlist'),
                 content: TextField(
                   controller: controller,
-                  decoration: const InputDecoration(labelText: 'YouTube URL'),
+                  decoration: const InputDecoration(labelText: 'Playlist Name'),
                 ),
                 actions: [
                   TextButton(
@@ -143,14 +133,14 @@ class PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, controller.text),
-                    child: const Text('Add'),
+                    child: const Text('Create'),
                   ),
                 ],
               );
             },
           );
-          if (videoUrl != null && videoUrl.isNotEmpty) {
-            await _addVideo(videoUrl);
+          if (name != null && name.isNotEmpty) {
+            await _createPlaylist(name);
           }
         },
         child: const Icon(Icons.add),

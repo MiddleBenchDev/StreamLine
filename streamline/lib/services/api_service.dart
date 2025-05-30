@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
-import '../models/playlist.dart';
-import '../models/video_progress.dart';
+import 'package:streamline/config/api_config.dart';
+import 'package:streamline/models/playlist.dart';
+import 'package:streamline/models/video_progress.dart';
 
 class ApiService {
-  Future<List<Playlist>> getPlaylists(String token) async {
+  final String token;
+
+  ApiService(this.token);
+
+  Future<List<Playlist>> getPlaylists() async {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/playlists'),
       headers: {'Authorization': 'Bearer $token'},
@@ -14,34 +18,48 @@ class ApiService {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((json) => Playlist.fromJson(json)).toList();
     }
-    throw Exception('Failed to load playlists');
+    throw Exception('Failed to fetch playlists');
   }
 
-  Future<void> createPlaylist(String token, String name) async {
-    await http.post(
+  Future<void> createPlaylist(String name) async {
+    final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/playlists'),
       headers: {
         'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: jsonEncode({'name': name}),
     );
+    if (response.statusCode != 201) {
+      throw Exception('Failed to create playlist');
+    }
   }
 
-  Future<void> addVideoToPlaylist(
-      String token, String playlistId, String videoUrl) async {
-    await http.post(
+  Future<void> addVideoToPlaylist(String playlistId, String videoUrl) async {
+    final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/playlists/add-video'),
       headers: {
         'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: jsonEncode({'playlistId': playlistId, 'videoUrl': videoUrl}),
     );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to add video');
+    }
   }
 
-  Future<List<VideoProgress>> getVideoProgress(
-      String token, String playlistId) async {
+  Future<void> deletePlaylist(String playlistId) async {
+    final response = await http.delete(
+      Uri.parse('${ApiConfig.baseUrl}/playlists/$playlistId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete playlist');
+    }
+  }
+
+  Future<List<VideoProgress>> getVideoProgress(String playlistId) async {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/videos/progress/$playlistId'),
       headers: {'Authorization': 'Bearer $token'},
@@ -50,68 +68,34 @@ class ApiService {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((json) => VideoProgress.fromJson(json)).toList();
     }
-    throw Exception('Failed to load video progress');
+    throw Exception('Failed to fetch video progress');
   }
 
-  Future<void> updateVideoStatus(
-      String token, String progressId, String status) async {
-    await http.put(
+  Future<void> createVideoProgress(String playlistId, String videoUrl) async {
+    final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/videos/progress'),
       headers: {
         'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json'
-      },
-      body: jsonEncode({'progressId': progressId, 'status': status}),
-    );
-  }
-
-  Future<void> createVideoProgress(
-      String token, String playlistId, String videoUrl) async {
-    await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/videos/progress'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: jsonEncode({'playlistId': playlistId, 'videoUrl': videoUrl}),
     );
-  }
-
-  Future<String> getVideoThumbnail(String videoUrl) async {
-    if (videoUrl.isEmpty) return '';
-    final videoId = videoUrl.split('v=')[1].split('&')[0];
-    final response = await http.get(
-      Uri.parse(
-          'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=$videoId&key=${ApiConfig.youtubeApiKey}'),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['items'][0]['snippet']['thumbnails']['medium']['url'];
+    if (response.statusCode != 201) {
+      throw Exception('Failed to create video progress');
     }
-    return '';
   }
 
-  Future<int> getVideoDuration(String videoUrl) async {
-    if (videoUrl.isEmpty) return 0;
-    final videoId = videoUrl.split('v=')[1].split('&')[0];
-    final response = await http.get(
-      Uri.parse(
-          'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=$videoId&key=${ApiConfig.youtubeApiKey}'),
+  Future<void> updateVideoStatus(String progressId, String status) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/videos/progress'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'progressId': progressId, 'status': status}),
     );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final duration = data['items'][0]['contentDetails']['duration'];
-      return _parseDuration(duration);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update video status');
     }
-    return 0;
-  }
-
-  int _parseDuration(String duration) {
-    final regex = RegExp(r'PT(\d+H)?(\d+M)?(\d+S)?');
-    final match = regex.firstMatch(duration);
-    int hours = int.parse(match?.group(1)?.replaceAll('H', '') ?? '0');
-    int minutes = int.parse(match?.group(2)?.replaceAll('M', '') ?? '0');
-    int seconds = int.parse(match?.group(3)?.replaceAll('S', '') ?? '0');
-    return hours * 3600 + minutes * 60 + seconds;
   }
 }

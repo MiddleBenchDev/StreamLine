@@ -1,47 +1,59 @@
 import 'package:flutter/material.dart';
-import '../models/playlist.dart';
-import '../models/video_progress.dart';
-import '../services/api_service.dart';
+import 'package:streamline/models/playlist.dart';
+import 'package:streamline/models/video_progress.dart';
+import 'package:streamline/services/api_service.dart';
 
 class PlaylistProvider with ChangeNotifier {
   List<Playlist> _playlists = [];
   List<VideoProgress> _progress = [];
-  final ApiService _apiService = ApiService();
 
   List<Playlist> get playlists => _playlists;
   List<VideoProgress> get progress => _progress;
 
   Future<void> fetchPlaylists(String token) async {
-    _playlists = await _apiService.getPlaylists(token);
+    final apiService = ApiService(token);
+    _playlists = await apiService.getPlaylists();
     notifyListeners();
   }
 
   Future<void> createPlaylist(String token, String name) async {
-    await _apiService.createPlaylist(token, name);
+    final apiService = ApiService(token);
+    await apiService.createPlaylist(name);
     await fetchPlaylists(token);
   }
 
   Future<void> addVideoToPlaylist(
       String token, String playlistId, String videoUrl) async {
-    await _apiService.addVideoToPlaylist(token, playlistId, videoUrl);
+    final apiService = ApiService(token);
+    await apiService.addVideoToPlaylist(playlistId, videoUrl);
     await fetchPlaylists(token);
   }
 
   Future<void> fetchVideoProgress(String token, String playlistId) async {
-    _progress = await _apiService.getVideoProgress(token, playlistId);
+    final apiService = ApiService(token);
+    _progress = await apiService.getVideoProgress(playlistId);
     notifyListeners();
   }
 
   Future<void> updateVideoStatus(
       String token, String progressId, String status) async {
-    await _apiService.updateVideoStatus(token, progressId, status);
-    await fetchVideoProgress(
-        token, _progress.firstWhere((p) => p.id == progressId).playlistId);
+    final apiService = ApiService(token);
+    await apiService.updateVideoStatus(progressId, status);
+    final playlistId =
+        _progress.firstWhere((p) => p.id == progressId).playlistId;
+    await fetchVideoProgress(token, playlistId);
   }
 
   Future<void> createVideoProgress(
       String token, String playlistId, String videoUrl) async {
-    await _apiService.createVideoProgress(token, playlistId, videoUrl);
+    final apiService = ApiService(token);
+    await apiService.createVideoProgress(playlistId, videoUrl);
     await fetchVideoProgress(token, playlistId);
+  }
+
+  Future<void> deletePlaylist(String token, String playlistId) async {
+    final apiService = ApiService(token);
+    await apiService.deletePlaylist(playlistId);
+    await fetchPlaylists(token);
   }
 }

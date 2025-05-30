@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:streamline/models/playlist.dart';
+import 'package:streamline/providers/auth_provider.dart';
+import 'package:streamline/providers/playlist_provider.dart';
 import 'package:streamline/providers/theme_provider.dart';
-import '../providers/auth_provider.dart';
-import '../providers/playlist_provider.dart';
-import '../screens/playlist_detail_screen.dart';
+import 'package:streamline/screens/login_screen.dart';
+import 'package:streamline/screens/playlist_detail_screen.dart';
+import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final playlistProvider = Provider.of<PlaylistProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Profile')),
+      appBar: AppBar(title: const Text('Profile')),
       body: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -25,35 +28,42 @@ class ProfileScreen extends StatelessWidget {
                   ? NetworkImage(authProvider.photoUrl!)
                   : null,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(authProvider.displayName ?? 'User',
-                style: Theme.of(context).textTheme.headline6),
-            SizedBox(height: 16),
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
             Text('Total Playlists: ${playlistProvider.playlists.length}'),
             Text(
                 'Completed Playlists: ${playlistProvider.playlists.where((p) => playlistProvider.progress.where((pr) => pr.playlistId == p.id && pr.status == 'completed').length == p.videos.length).length}'),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (playlistProvider.progress.isNotEmpty)
               GestureDetector(
                 onTap: () {
                   final lastPlaylist = playlistProvider.playlists.firstWhere(
                     (p) => p.id == playlistProvider.progress.last.playlistId,
-                    orElse: () => playlistProvider.playlists.first,
+                    orElse: () => Playlist(
+                      id: '',
+                      name: 'None',
+                      videos: [],
+                      totalDuration: 0,
+                    ),
                   );
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            PlaylistDetailScreen(playlist: lastPlaylist)),
-                  );
+                  if (lastPlaylist.id.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              PlaylistDetailScreen(playlist: lastPlaylist)),
+                    );
+                  }
                 },
                 child: Text(
-                    'Last Watched Playlist: ${playlistProvider.playlists.firstWhere((p) => p.id == playlistProvider.progress.last.playlistId, orElse: () => Playlist(id: '', name: 'None', videos: [], createdAt: DateTime.now())).name}'),
+                    'Last Watched Playlist: ${playlistProvider.playlists.firstWhere((p) => p.id == playlistProvider.progress.last.playlistId, orElse: () => Playlist(id: '', name: 'None', videos: [], totalDuration: 0)).name}'),
               ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             DropdownButton<ThemeMode>(
               value: Provider.of<ThemeProvider>(context).themeMode,
-              items: [
+              items: const [
                 DropdownMenuItem(
                     value: ThemeMode.system, child: Text('System Default')),
                 DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
@@ -66,13 +76,16 @@ class ProfileScreen extends StatelessWidget {
                 }
               },
             ),
-            Spacer(),
+            const Spacer(),
             ElevatedButton(
-              onPressed: () {
-                authProvider.signOut();
-                Navigator.pushReplacementNamed(context, '/login');
+              onPressed: () async {
+                await authProvider.signOut();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
               },
-              child: Text('Logout'),
+              child: const Text('Logout'),
             ),
           ],
         ),

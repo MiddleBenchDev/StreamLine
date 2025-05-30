@@ -1,46 +1,39 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:streamline/models/video_progress.dart';
 
 class VideoTile extends StatelessWidget {
-  final String videoUrl;
-  final dynamic progress;
-  final VoidCallback onTap;
+  final VideoProgress progress;
   final Function(String) onStatusChanged;
+  final VoidCallback onTap;
 
-  VideoTile(
-      {required this.videoUrl,
-      required this.progress,
-      required this.onTap,
-      required this.onStatusChanged});
+  const VideoTile({
+    super.key,
+    required this.progress,
+    required this.onStatusChanged,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final apiService = ApiService();
-    return FutureBuilder(
-      future: apiService.getVideoThumbnail(videoUrl),
-      builder: (context, snapshot) {
-        final thumbnail = snapshot.data ?? '';
-        return ListTile(
-          leading: thumbnail.isNotEmpty
-              ? Image.network(thumbnail,
-                  width: 50, height: 50, fit: BoxFit.cover)
-              : Icon(Icons.video_library),
-          title: Text(videoUrl.split('v=')[1].split('&')[0]),
-          trailing: DropdownButton<String>(
-            value: progress.status,
-            items: [
-              DropdownMenuItem(value: 'incomplete', child: Text('Incomplete')),
-              DropdownMenuItem(value: 'completed', child: Text('Completed')),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                onStatusChanged(value);
-              }
-            },
-          ),
-          onTap: onTap,
-        );
-      },
+    return ListTile(
+      leading: progress.thumbnail != null
+          ? Image.network(progress.thumbnail!, width: 50, height: 50)
+          : const Icon(Icons.video_library, size: 50),
+      title: Text(progress.videoUrl.split('v=')[1]),
+      subtitle: Text('Duration: ${progress.duration ~/ 60} min'),
+      trailing: DropdownButton<String>(
+        value: progress.status,
+        items: const [
+          DropdownMenuItem(value: 'incomplete', child: Text('Incomplete')),
+          DropdownMenuItem(value: 'completed', child: Text('Completed')),
+        ],
+        onChanged: (value) {
+          if (value != null) {
+            onStatusChanged(value);
+          }
+        },
+      ),
+      onTap: onTap,
     );
   }
 }
